@@ -1,0 +1,80 @@
+---
+title: Testing
+authors:
+  - name: Nicholas Harbour
+format: 
+  html:
+    embed-resources: true
+    code-fold: true
+    number-sections: true
+    toc: true
+    toc-depth: 3
+    date: now
+    date-modified: last-modified
+    date-format: "MMMM DD, YYYY, HH:mm:ss"
+jupyter: python3
+---
+
+
+```{python}
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from scipy.special import i0 
+
+```
+
+
+# Virtual patients based on the param values
+
+
+```{python}
+
+param_vals = pd.read_csv('Param_values.csv')
+
+vals = param_vals['param_values'].values
+
+```
+
+Convert string to arrays
+```{python}
+
+num_vals = np.zeros([len(vals), 9])
+
+for i in range(len(vals)):
+
+    cleaned_string = vals[i].strip('[]').replace('\n', ' ')
+    num_vals[i,:] = np.fromstring(cleaned_string, sep=' ')
+
+```
+
+Take mean of each param
+
+```{python}
+
+mean_vals = np.mean(num_vals, axis=0)
+
+def func(x, *params):
+    y = np.zeros_like(x)
+    for i in range(0, len(params), 3):
+        ctr = params[i]
+        amp = params[i+1]
+        wid = params[i+2]
+        y = y + amp*np.exp(wid*np.cos(x-ctr))/(2*np.pi*i0(wid))
+    return y
+
+x = np.linspace(-np.pi, np.pi, 1000)
+y = func(x, *mean_vals)
+plt.plot(x,y)
+
+    
+for i in range(0, len(mean_vals), 3):
+      ctr = mean_vals[i]
+      amp = mean_vals[i+1]
+      wid = mean_vals[i+2]
+      y = amp*np.exp(wid*np.cos(x-ctr))/(2*np.pi*i0(wid))
+      plt.plot(x, y,'--', alpha = 0.8)
+
+```

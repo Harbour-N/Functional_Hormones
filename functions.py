@@ -3,6 +3,7 @@ import pandas as pd
 import datetime as dt
 import skfda
 
+
 ################################## 
 # Functions to preprocess the data
 ##################################
