@@ -176,6 +176,17 @@ def df_to_fda_class(df_common):
     return fd
 
 
+# Map -pi to pi onto a range of 12-36
+def map_pi_to_range(x):
+    y = 12/np.pi * x + 24
+    return y
+
+def map_range_to_pi(y):
+    x = np.pi/12*(y-24)
+    return x
+
+
+
 ########################## 
 # Registration of the data
 ##########################
