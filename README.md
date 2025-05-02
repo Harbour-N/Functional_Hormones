@@ -34,6 +34,22 @@ Note the metadata file contain an extra MasterID for which we do not have hormon
 
 ## Data pre-processing
 
+## Fitting Von Meises model
+
+In the file `fitting.qmd` we fit our relarively simple functional data analysis model of cortisol. This comprises of the sum of 3 basis functions and weights. Since each von Meisis disitiubution has 3 parameters (Mean, amplitute, standard deiviation / dispersion) this model has 9 parameters in total (reducing the amount of data needed to fully descripe the model from 72 time points to 9 parameters).
+
+The output of this notebook is a csv file contianing all the fitted parameters for each participant `Param_values.csv`. The parameters are save in a list or given individually in both cases:
+
+- param0 = mean (basis1)
+- param1 = amplitude (basis1)
+- param2 = dispersion (basis1)
+- param3 = mean (basis2)
+- param4 = amplitude (basis2)
+- param5 = dispersion (basis2)
+- param6 = mean (basis3)
+- param7 = amplitude (basis3)
+- param8 = dispersion (basis3)
+
 ## PCA of hormone time series data
 
 ## Fitting Von Meises model
