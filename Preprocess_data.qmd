@@ -176,3 +176,53 @@ plt.xticks(np.arange(720, 2160+240, 240),[12,16,20,0,4,8,12])
 plt.show()
 
 ```
+
+
+# merge metadata files into single file
+
+```{python}
+
+# Load in the metatadata files
+meta_914 = pd.read_csv('Data/form_914_controls.csv')
+meta_912 = pd.read_csv('Data/form_912_controls.csv')
+
+```
+
+```{python}
+
+meta_914.head()
+
+```
+
+
+```{python}
+
+meta_912.head()
+
+```
+
+
+```{python}
+
+# Merge the two metadata files
+meta_merge = pd.merge(meta_914, meta_912, on='MasterID', how='outer')
+
+```
+
+```{python}
+
+# Remove the 2 MasterIDs we did in the time series
+meta_merge = meta_merge[meta_merge['MasterID'] != 5081]
+meta_merge = meta_merge[meta_merge['MasterID'] != 761]
+
+# We do not have hormone reading for MasterID 5071
+meta_merge = meta_merge[meta_merge['MasterID'] != 5071]
+
+meta_merge.reset_index(drop=True, inplace=True)
+
+meta_merge.head()
+
+meta_merge.to_csv('Data/Metadata_merge.csv', index=False)
+
+```
+

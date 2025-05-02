@@ -13,7 +13,7 @@ Data is stored in the `Data` folder.
 - `redcap_controls.csv` - The majority of the time series metadata is contained in redcap, eg: wake time, lunch time, physical activity etc..., for a full list of the metadat recorded see the file `Dictionary_redcap.csv`. Metadata is recoded by participants over 3 days. Hormone sampling typically started in the morning of day 2 and therefore ends 24hrs later in the morning of day 3. This metadata is self recoded by participants.
 - `form_914_controls.csv` - Main physiological metadata, columns of interest are: GenderId, WAIST, HIP, WAIST_HIP_RATIO, SYSBP, DIABP, BMI, Age.
 - `form_912_controls.csv` - More physiological metadata. Addition data includes smoker status and HEIGHT.
-- `Metadata_all.csv` - combination of the 914 and 912 metadata files into a single file.
+- `Metadata_merge.csv` - combination of the 914 and 912 metadata files into a single file.
 
 Some of the column names are appreciations these stand for and take the following options:
 
@@ -27,6 +27,8 @@ Some of the column names are appreciations these stand for and take the followin
 * BMI = Body mass index (Kg/m^2)
 * ULT_Smoker = Smoker status, yes = 1, no = 2.
 * HEIGHT = (cm)
+
+Note the metadata file contain an extra MasterID for which we do not have hormone data for (MasterID = 5071) so we remove them in the preprocessing stage.
 
 # Code
 
