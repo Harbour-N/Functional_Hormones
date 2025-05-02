@@ -40,63 +40,15 @@ from functions import *
 Load in the data and interpolate it.
 ```{python}
 
-df = load_data("Data/Hormone_time_series_data.csv")
+df_com = pd.read_csv("Data/Hormone_time_series_data_interpolated.csv")
 
-df_meta = pd.read_csv("Data/Metadata_RedCap.csv")
+num = df_to_numpy(df_com, "Cortisol")
 
-df_common = common_time(df, interp_limit = 40)
+common_t = df_com["NewTime"].iloc[0:72].values
 
-num = df_to_numpy(df_common, "Cortisol")
-
-new_df = circle_shift(df)
-
-# Z (mean) transform the data
-num_Z = np.zeros(num.shape)
-for i in range(len(num[:,0])):
-    num_Z[i,:] = (num[i,:] - np.mean(num[i,:]))/np.std(num[i,:])
-
-
-hormones = df.columns[4:-1]
-
-common_t = df_common["NewTime"].iloc[0:72].values
-
-# NOTE one of the IDs is not in the time series date
-# Find identifiers in df["PID"] that are not in df_meta["id_participant"]
-not_in_time_series = df_meta[~df_meta['id_participant'].isin(df['PID'])]
-df_meta = df_meta[df_meta['id_participant'].isin(df['PID'])]
-# reset the index
-df_meta = df_meta.reset_index(drop=True)
 
 ```
 
-
-# Plot the data
-
-```{python}
-
-# Get a list of unique PIDs
-PIDs = new_df['PID'].unique()
-
-# First consider patients which have exactly 72 time points
-for PID in PIDs:
-
-    # Get the data for this PID
-    data = new_df[new_df['PID'] == PID]
-    # Check if the number of time points is 72
-    
-    # Plot the data
-    plt.plot(data['NewTime'], data['Cortisol'], label=PID)
-    plt.xlabel('Time')
-    plt.ylabel('Cortisol')
-    plt.title(f'Cortisol levels for {PID}')
-    plt.axvline(720, color='r', linestyle='--', label='Midnight')
-    plt.axvline(1440, color='g', linestyle='--', label='Midday')
-    plt.axvline(2160, color='b', linestyle='--', label='Midnight')
-    plt.show()
-    
-    
-
-```
 
 
 # Fit the basis functions
@@ -109,7 +61,7 @@ $$
 
 Where $x_i(t)$ is the value of the $i$ th time series at time $t$. $w_{i,j}$ is the weight of the $j$ th basis function for the person $i$. $\phi_j(t)$ is the basis function and $k$ is the number of basis functions. 
 
-We take the basis functions to be von Mises distriubtion, which is given by:
+We take the basis functions to be von Mises distribution, which is given by:
 
 $$
   f(x | \mu, \kappa) = \frac{e^{\kappa \cos(x - \mu)}}{2\pi I_0(\kappa)}
@@ -149,6 +101,7 @@ def fit_von_mises(time_series, n_basis):
 
     # Peak location bounds define lunch dinner and wake time as the location of the 3 peaks
 
+    # We partition the basis functions into 3 locations, wake time, lunch time and dinner time
     # Basis 1 wake time
     bounds[0, 0] = np.pi/4.0
     bounds[1, 0] = 11/12 * np.pi
@@ -221,7 +174,7 @@ for i in range(0, len(popt), 3):
     y = amp*np.exp(wid*np.cos(t-ctr))/(2*np.pi*i0(wid))
     plt.plot(t, y,'--', alpha = 0.8)
 
-plt.title("Example Von Mises fit")
+plt.title("Example Von Mises fit for single participant")
 plt.show()
 
 ```
@@ -229,9 +182,7 @@ plt.show()
 
 ## Fit 3 basis function to all patients
 
-Lets fit 3 basis function to all patient and see which ones it fits the data well for and identify one that may need to be fit re-fit due to problems with the default optimization. 
-
-When we fit the basis function model, the order of the basis functions is arbitrary and can be interchanges without altering the overall model.
+Lets fit 3 basis function to all patient and see which ones it fits the data well for and identify one that may need to be re-fit due to problems with the default optimization. 
 
 
 
@@ -268,7 +219,6 @@ for i in range(len(num)):
 Plot a number of the model fits on a single plot
 
 ```{python}
-
 
 
 def plot_single(popt, t, time_series,ax, ss_res = -1):
@@ -553,18 +503,27 @@ plt.show()
 ```{python}
 
 # Define the column names
-column_names = ['PID', 'Cortisol', 'param_values', 'R2']
+column_names = ['MasterID', 'Cortisol', 'param_values', 'Param0', 'param1', 'param2', 'param3','param4', 'param5','param6','param7', 'param8' ,'R2']
 
 # Create a list to hold the new rows
 rows = []
 
-PIDs = df_common["PID"].unique()
+MasterIDs = df_com["MasterID"].unique()
 
-for i in range(len(PIDs)):
+for i in range(len(MasterIDs)):
     new_row = {
-        'PID': PIDs[i], 
+        'MasterID': MasterIDs[i], 
         'Cortisol': num[i],
         'param_values': basis_save[i, :],
+        'Param0': basis_save[i, 0],
+        'param1': basis_save[i, 1],
+        'param2': basis_save[i, 2],
+        'param3': basis_save[i, 3],
+        'param4': basis_save[i, 4],
+        'param5': basis_save[i, 5],
+        'param6': basis_save[i, 6],
+        'param7': basis_save[i, 7],
+        'param8': basis_save[i, 8],
         'R2': ss_res_save[i]
     }
     rows.append(new_row)
