@@ -256,7 +256,6 @@ def map_range_to_pi(y):
     return x
 
 
-
 ########################## 
 # Registration of the data
 ##########################

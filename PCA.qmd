@@ -1,0 +1,52 @@
+---
+title: Perform PCA on the cortisol time series data
+authors:
+  - name: Nicholas Harbour
+format: 
+  html:
+    embed-resources: true
+    code-fold: true
+    number-sections: true
+    toc: true
+    toc-depth: 3
+    date: now
+    date-modified: last-modified
+    date-format: "MMMM DD, YYYY, HH:mm:ss"
+jupyter: python3
+---
+
+
+```{python}
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+
+# import functions 
+import functions as fn
+
+```
+
+
+Load in the data
+```{python}
+
+df_com = pd.read_csv("Data/Hormone_time_series_data_interpolated.csv")
+
+num = fn.df_to_numpy(df_com, "Cortisol")
+
+common_t = df_com["NewTime"].iloc[0:72].values
+
+```
+
+
+# Perform PCA on cortisol time series data
+
+```{python}
+
+pca = PCA(n_components=10)
+pca_res = pca.fit(num)
+
+
+```

@@ -37,7 +37,7 @@ from functions import *
 
 ```
 
-Load in the data and interpolate it.
+Load in the data
 ```{python}
 
 df_com = pd.read_csv("Data/Hormone_time_series_data_interpolated.csv")
@@ -45,7 +45,6 @@ df_com = pd.read_csv("Data/Hormone_time_series_data_interpolated.csv")
 num = df_to_numpy(df_com, "Cortisol")
 
 common_t = df_com["NewTime"].iloc[0:72].values
-
 
 ```
 
@@ -330,6 +329,14 @@ I the case that we have poor fit we will recalculate the fit starting the optimi
 
 ```{python}
 
+bs1_lb = np.pi/4.0
+bs1_ub = 11/12 * np.pi
+bs2_lb = -np.pi 
+bs2_ub = -np.pi * 2/3
+bs3_lb = -np.pi * 2/3
+bs3_ub = np.pi * 1/4
+bs_bounds = [bs1_lb, bs1_ub, bs2_lb, bs2_ub, bs3_lb, bs3_ub]
+
 def fit_von_mises_opt(time_series, n_basis,nRMSE_threshold):
 
     '''
@@ -347,14 +354,14 @@ def fit_von_mises_opt(time_series, n_basis,nRMSE_threshold):
     bounds = np.zeros([2, 3*n_basis])
 
     # Basis 1 wake time
-    bounds[0, 0] = np.pi/4.0
-    bounds[1, 0] = 11/12 * np.pi
+    bounds[0, 0] = bs1_lb
+    bounds[1, 0] = bs1_ub
     # Basis 2 lunch time
-    bounds[0, 3] = -np.pi
-    bounds[1, 3] = -np.pi * 2/3
+    bounds[0, 3] = bs2_lb 
+    bounds[1, 3] =  bs2_ub
     # Basis 3 dinner time
-    bounds[0, 6] = -np.pi * 2/3
-    bounds[1, 6] = -np.pi * 1/12
+    bounds[0, 6] = bs3_lb
+    bounds[1, 6] = bs3_ub
 
     # If the fit is bad try the optimisation again with a different initial guess
     if accuracy > nRMSE_threshold:
@@ -363,12 +370,12 @@ def fit_von_mises_opt(time_series, n_basis,nRMSE_threshold):
             for k in range(n_basis):
 
                 if k == 0:
-                    guess[3*k] = np.random.uniform(np.pi/4.0,11/12 * np.pi)
+                    guess[3*k] = np.random.uniform(bs1_lb,bs1_ub)
               
                 elif k == 1:
-                    guess[3*k] = np.random.uniform(-np.pi,-np.pi * 2/3)
+                    guess[3*k] = np.random.uniform(bs2_lb,bs2_ub)
                 elif k == 2:
-                    guess[3*k] = np.random.uniform(-np.pi * 2/3,-np.pi * 1/12)
+                    guess[3*k] = np.random.uniform(bs3_lb,bs3_ub)
                
                # Amplitute / weight
                 guess[3*k+1] = np.random.uniform(0,40) 
@@ -384,7 +391,7 @@ def fit_von_mises_opt(time_series, n_basis,nRMSE_threshold):
                 bounds[0, 3*k + 2] = 2
                 bounds[1, 3*k + 2] = 200
 
-            popt, pcov = curve_fit(func, t, time_series, p0=guess, maxfev=1000000000, bounds = bounds)
+            popt, pcov = curve_fit(func, t, time_series, p0=guess, maxfev=1000000000)
             fit = func(t, *popt)
             accuracy = NRMSE(time_series, fit)
             if best_fit > accuracy:
@@ -480,7 +487,7 @@ The shift parameter is the 1st parameter, the weight/amplitude is the 2nd and th
 ```{python}
 
 
-
+dum = 0
 fig, ax = plt.subplots(3,3, figsize = (15,10))
 
 for j in range(3):
@@ -488,8 +495,12 @@ for j in range(3):
         ax[j,i].hist(basis_save[:,i + 3*j], bins = 20, density = True)
         ax[j,i].set_title(f"Distribution of parameter {i + 3*j}")
 
+
         if i == 0:
             ax[j,i].set_xlim([-np.pi,np.pi])
+            ax[j,i].axvline(x = bs_bounds[dum], color = 'r', linestyle = '--')
+            ax[j,i].axvline(x = bs_bounds[dum + 1], color = 'r', linestyle = '--')
+            dum = dum +2
 
 
 plt.show()
