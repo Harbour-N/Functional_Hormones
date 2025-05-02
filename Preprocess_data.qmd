@@ -1,0 +1,178 @@
+---
+title: Preprocess the data
+description: In this notebook we will pre-process the raw data and create our own csv file that containst the time series all on a common time grid
+authors:
+  - name: Nicholas Harbour
+format: 
+  html:
+    embed-resources: true
+    code-fold: true
+    number-sections: true
+    toc: true
+    toc-depth: 3
+    date: now
+    date-modified: last-modified
+    date-format: "MMMM DD, YYYY, HH:mm:ss"
+jupyter: python3
+---
+
+There are 2 participants that I will remove 
+
+- 5081 - this participant has 2 days of recordings and the time stamps don't match.
+
+- 761 - This participant has 1 reading that is very high and then all the other readings are very low (often below the limit of quantification of the device).
+
+
+Import python libraries required for the analysis
+```{python}
+
+# Import the necessary libraries
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+import datetime as dt
+from scipy.special import i0 
+from scipy.optimize import curve_fit
+from scipy.stats import circvar
+from matplotlib.ticker import MaxNLocator
+from matplotlib.lines import Line2D
+
+# import functions 
+from functions import *
+
+```
+
+Load in the raw hormone time series data from the original publication: [https://www.science.org/doi/10.1126/scitranslmed.adg8464](https://www.science.org/doi/10.1126/scitranslmed.adg8464)
+```{python}
+ 
+#df = load_data("Data/md_data_controls.csv")
+df = load_data("Data/md_data_controls.csv")
+
+```
+
+Print some data frame information
+
+```{python}
+
+df.info()
+df.head()
+
+print(f'Number of unique MasterIDs: {len(df["MasterID"].unique())}')
+
+
+
+```
+
+Create a new df where the ciruclar nature of the data has been utilize to create a single time period of 24 hours.
+```{python}
+df_new = circle_shift(df)
+```
+
+Create a new df where we have interpolated the time series of hormone meausrements so that we have a common time grid (i.e., all recordings at the same time between patients). This makes the data easier to work with.
+
+```{python}
+
+df_com = common_time(df_new,interp_limit=5)
+
+```
+
+We will save this version of the data to a new csv file as this is the main version of the data we will use from this point forward
+
+```{python}
+
+df_com.to_csv('Data/Hormone_time_series_data_interpolated.csv', index=False)
+
+```
+
+Print some basic information about the data
+
+```{python}
+
+df_com.info()
+
+df_com.head()
+
+MasterIDs = df_com['MasterID'].unique()
+print(f'Number of unique MasterIDs: {len(MasterIDs)}')
+
+flag = 0
+for i in MasterIDs:
+  if len(df_com[df_com['MasterID'] == i]) != 72:
+    print(f'MasterID {i} has {len(df_com[df_com['MasterID'] == i])} time points')
+    flag = 1
+
+if flag == 0:
+  print('All MasterIDs have been filtered to contain 72 time points')
+
+
+
+```
+
+# Plot the data to check that the preprocess has been done succesfully
+
+Plot each participant individually
+
+```{python}
+
+
+
+# First consider patients which have exactly 72 time points
+for MasterID in MasterIDs:
+
+    # Get the data for this MasterID
+    data_com = df_com[df_com['MasterID'] == MasterID]
+    data_new = df_new[df_new['MasterID'] == MasterID]
+    
+    # Plot the data
+    plt.plot(data_new['NewTime'], data_new['Cortisol'],'o-', label=MasterID, color = 'tab:orange', alpha = 0.75)
+    plt.plot(data_com['NewTime'], data_com['Cortisol'],'--', label=MasterID, color = 'tab:blue')
+
+    plt.xlabel('Time')
+    plt.ylabel('Cortisol')
+    plt.title(f'Cortisol levels for {MasterID}')
+    #plt.axvline(720, color='r', linestyle='--', label='Midnight')
+    #plt.axvline(1440, color='g', linestyle='--', label='Midday')
+    #plt.axvline(2160, color='b', linestyle='--', label='Midnight')
+    # Change x axis to be in hours
+    plt.xticks(np.arange(720, 2160+240, 240),[12,16,20,0,4,8,12])
+    plt.legend(['Original data', 'Interpolated data'])
+    #plt.savefig(f'Plots/Individuals_cortisol/{MasterID}_cortisol.png')
+    plt.show()
+    
+    
+    
+
+```
+
+
+Plot them all together
+
+```{python}
+
+for MasterID in MasterIDs:
+
+    # Get the data for this MasterID
+    data = df_com[df_com['MasterID'] == MasterID]
+    
+    # Plot the data
+    plt.plot(data['NewTime'], data['Cortisol'], color = 'tab:blue', alpha = 0.5)
+
+# Add mean line
+mean_cortisol = df_com.groupby('NewTime')['Cortisol'].mean()
+plt.plot(data['NewTime'], mean_cortisol, color = 'tab:orange', linewidth=3, label='Mean')
+
+plt.xlabel('Time')
+plt.ylabel('Cortisol')
+plt.title(f'Cortisol levels for all MasterIDs')
+
+leg_handles= [Line2D([0], [0], color='tab:blue', linewidth=3),
+                Line2D([0], [0], color='tab:orange', linewidth=3) ] 
+plt.legend(leg_handles,['Individuals','L2 Mean'])
+
+# Change x axis to be in hours
+plt.xticks(np.arange(720, 2160+240, 240),[12,16,20,0,4,8,12])
+
+plt.show()
+
+```

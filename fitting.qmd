@@ -48,6 +48,8 @@ df_common = common_time(df, interp_limit = 40)
 
 num = df_to_numpy(df_common, "Cortisol")
 
+new_df = circle_shift(df)
+
 # Z (mean) transform the data
 num_Z = np.zeros(num.shape)
 for i in range(len(num[:,0])):
@@ -64,6 +66,35 @@ not_in_time_series = df_meta[~df_meta['id_participant'].isin(df['PID'])]
 df_meta = df_meta[df_meta['id_participant'].isin(df['PID'])]
 # reset the index
 df_meta = df_meta.reset_index(drop=True)
+
+```
+
+
+# Plot the data
+
+```{python}
+
+# Get a list of unique PIDs
+PIDs = new_df['PID'].unique()
+
+# First consider patients which have exactly 72 time points
+for PID in PIDs:
+
+    # Get the data for this PID
+    data = new_df[new_df['PID'] == PID]
+    # Check if the number of time points is 72
+    
+    # Plot the data
+    plt.plot(data['NewTime'], data['Cortisol'], label=PID)
+    plt.xlabel('Time')
+    plt.ylabel('Cortisol')
+    plt.title(f'Cortisol levels for {PID}')
+    plt.axvline(720, color='r', linestyle='--', label='Midnight')
+    plt.axvline(1440, color='g', linestyle='--', label='Midday')
+    plt.axvline(2160, color='b', linestyle='--', label='Midnight')
+    plt.show()
+    
+    
 
 ```
 
