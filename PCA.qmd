@@ -38,6 +38,8 @@ num = fn.df_to_numpy(df_com, "Cortisol")
 
 common_t = df_com["NewTime"].iloc[0:72].values
 
+df_meta
+
 ```
 
 
@@ -47,6 +49,29 @@ common_t = df_com["NewTime"].iloc[0:72].values
 
 pca = PCA(n_components=10)
 pca_res = pca.fit(num)
+
+
+```
+
+
+# Visualise the PCA results
+
+```{python}
+
+fig, ax = plt.subplots(2,3,figsize=(10, 6), sharey=True, sharex=True)
+
+ax = ax.flatten()
+
+for i in range(6):
+    ax[i].plot(pca_res.components_[i,:])
+    ax[i].set_title(f"Principal component {i+1}")
+    if i >2:
+      ax[i].set_xlabel("Time")
+      ax[i].set_xticks(np.arange(0, 72+12, 12), ['12', '16', '20', '24', '04', '08','12'])
+  
+
+ax[0].set_ylabel("Loading")
+ax[3].set_ylabel("Loading")
 
 
 ```

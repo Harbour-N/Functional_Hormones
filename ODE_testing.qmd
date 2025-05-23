@@ -1,0 +1,138 @@
+---
+title: ODE model testing
+authors:
+  - name: Nicholas Harbour
+format: 
+  html:
+    embed-resources: true
+    code-fold: true
+    number-sections: true
+    toc: true
+    toc-depth: 3
+    date: now
+    date-modified: last-modified
+    date-format: "MMMM DD, YYYY, HH:mm:ss"
+jupyter: python3
+---
+
+```{python}
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+```
+
+When a stressor occurs (e.g., a fear response or pain), the body rapidly activates the hypothalamic–pituitary–adrenal (HPA) axis:
+
+CRH is released by the hypothalamus
+
+Stimulates ACTH from the pituitary
+
+ACTH travels to the adrenal glands → releases cortisol.
+
+Cortisol must travel through blood → cross the blood-brain barrier → and reach the CSF
+
+This process is not instantaneous, nor is it a simple delay
+
+The CSF cortisol level rises gradually, peaks, and then decays
+
+So we model this transformation from an instantaneous stressor to a smoothed CSF cortisol response with a kernel that captures this temporal spread
+
+Cortisol / adrenal hormones are a pulsatile process and there are many complicated mathemtical models that attempt to describe this process.
+
+The simples model would be something like this:
+
+$$
+\frac{dC}{dt} = -\lambda C + S(t)
+$$
+
+where $C$ is the concentration of cortisol, $\lambda$ is the rate of decay, and $f(t)$ is a function that describes the pulsatile nature of the hormone - in particular it is an idicator function that is 0 most of the time and 1 at the time of the pulse.
+
+But We are modeling / meausring CSF cortisol so there is some delay / smoothing from the stressful event to the CSF cortisol levels
+
+thus we get the simple system of ODEs:
+
+$$
+\begin{align}
+\frac{dC}{dt} &= -\lambda C + S_{effect}(t)
+\end{align}
+$$
+
+where $S_{effect}$ is the effect of the stressor on the cortisol levels and $\tau$ is the time constant for the effect of the stressor on the cortisol levels. and $S$ is the stressor function.
+
+where $S_{effect}$ describes the effect of an instantaneous stressor on cortisol
+
+$$
+S_{effect}(t) = \int_0^t S(t) k(t - \tau) d\tau
+$$
+
+where $k(t)$ is the kernel function that describes the effect of the instanteous stressor on cortisol.
+
+```{python}
+
+t= np.linspace(0, 24, 1001)
+dt = t[1] - t[0]
+
+def Stress(t):
+    S = np.zeros(len(t))
+    for i in range(len(t)):
+        if t[i] >1 and t[i] < 2:
+            S[i] = 1
+        elif t[i] >11 and t[i] < 12:
+            S[i] = 0.5
+        elif t[i] >21 and t[i] < 22:
+            S[i] = 0.7
+        else:
+            S[i] = 0
+    return S
+
+# solve stress effect ODE
+# Alpha kernel function
+def alpha_kernel(tau, t_max, dt):
+    t_kernel = np.arange(0, t_max, dt)
+    kernel = (t_kernel / tau**2) * np.exp(-t_kernel / tau)
+    kernel /= np.sum(kernel) * dt  # Normalize area under the curve to 1
+    return kernel
+
+# Convolve stress with kernel
+def apply_kernel(S, kernel):
+    S_effect = np.convolve(S, kernel, mode='full')[:len(S)]
+    return S_effect
+
+# solve cortisol ODE
+def dC(S_effect, lambda_):
+    C= np.zeros(len(t))
+    C[0] = 0 # set IC
+    for i in range(len(t)-1):
+            C[i+1] = C[i] + dt*(-lambda_ * C[i] + S_effect[i])
+
+    return C
+
+
+
+```
+
+
+```{python}
+# Parameters
+tau = 0.25
+lambda_ = 1
+S = Stress(t)
+kernel = alpha_kernel(tau=tau, t_max=10, dt=dt)
+S_effect = apply_kernel(S, kernel)
+C = dC(S_effect, lambda_)
+fig,ax = plt.subplots(1,3,figsize=(10,5))
+
+
+ax[0].plot(t,S)
+ax[0].set_title("Stress function S(t)")
+
+ax[1].plot(t,S_effect)
+ax[1].set_title("Stress effect S_effect(t)")
+
+ax[2].plot(t,C)
+ax[2].set_title("Cortisol C(t)")
+
+
+```

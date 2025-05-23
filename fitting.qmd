@@ -28,9 +28,11 @@ import pandas as pd
 import seaborn as sns
 import datetime as dt
 from scipy.special import i0 
-from scipy.optimize import curve_fit
+from scipy.optimize import minimize
 from scipy.stats import circvar
 from matplotlib.ticker import MaxNLocator
+from scipy.optimize import differential_evolution
+from scipy.optimize import NonlinearConstraint
 
 # import functions 
 from functions import *
@@ -78,71 +80,42 @@ In the model fit we have the following constraints/bounds:
 
 ```{python}
 
-def func(x, *params):
-    y = np.zeros_like(x)
+t = np.linspace(-np.pi, np.pi, num=72)
+
+def Von_Mises_model(params,t):
+    '''
+    Our functional data analysis approach uses a sum of von Mises basis functions.
+    We consider 3 basis functions, roughly inspired by the idea of one for each of the three meals (breakfast, lunch and dinner).
+
+    Inputs:
+    t: time domain
+    params: list of parameters for the von Mises basis functions
+        params[0] = mean location
+        params[1] = amplitude / weight
+        params[2] = dispersion / standard deviation
+    Outputs:
+    y: np.array of the same size as x, the model fit (sum of the basis functions)
+    '''
+
+    y = np.zeros_like(t)
     for i in range(0, len(params), 3):
         ctr = params[i]
         amp = params[i+1]
         wid = params[i+2]
-        y = y + amp*np.exp(wid*np.cos(x-ctr))/(2*np.pi*i0(wid))
+        y = y + amp*np.exp(wid*np.cos(t-ctr))/(2*np.pi*i0(wid))
     return y
 
-t = np.linspace(-np.pi, np.pi, num=72)
-
-def fit_von_mises(time_series, n_basis):
-
-    '''
-    Fit the von Mises basis to a single time series
-    '''
-
-    guess = np.zeros(3*n_basis)
-    bounds = np.zeros([2, 3*n_basis])
-
-    # Peak location bounds define lunch dinner and wake time as the location of the 3 peaks
-
-    # We partition the basis functions into 3 locations, wake time, lunch time and dinner time
-    # Basis 1 wake time
-    bounds[0, 0] = np.pi/4.0
-    bounds[1, 0] = 11/12 * np.pi
-    # Basis 2 lunch time
-    bounds[0, 3] = -np.pi
-    bounds[1, 3] = -np.pi * 2/3
-    # Basis 3 dinner time
-    bounds[0, 6] = -np.pi * 2/3
-    bounds[1, 6] = -np.pi * 1/12
-
-    for k in range(n_basis):
-
-        #guess[3*k] = np.random.uniform(-np.pi, np.pi) # mean location
-        if k == 0:
-            guess[3*k] = 0.5*np.pi # mean location
-        elif k == 1:
-            guess[3*k] = -0.75*np.pi
-        elif k == 2:
-            guess[3*k] = -0.5*np.pi
-        guess[3*k+1] = 30 # amplitude/wieght
-        guess[3*k+2] = 6 #dispersion
-
-        # Peak location
-        #bounds[0, 3*k] = -np.pi
-        #bounds[1, 3*k] = np.pi
-    
-
-        # Amplitude (we will enforce this to be positive)
-        bounds[0, 3*k + 1] = 0
-        bounds[1, 3*k + 1] = 40
-
-        # The dispersion, to give a more peaky distirbution increase the lower bound 'peaky distributions'
-        bounds[0, 3*k + 2] = 2
-        bounds[1, 3*k + 2] = 200
-
-    popt, pcov = curve_fit(func, t, time_series, p0=guess, maxfev=100000000, bounds = bounds)
-    #popt, pcov = curve_fit(func, t, time_series, p0=guess, maxfev=100000000)
-    fit = func(t, *popt)
-
-    return  popt
 
 def NRMSE(data,model):
+    '''
+    Normalized root mean square error
+
+    Inputs:
+    data: np.array / list of the data points
+    model: np.array / list of the model fit
+    Outputs:
+    nRMSE: normalized root mean square error
+    '''
     n_points = len(data)
     MSE = 0
     for i in range(n_points):
@@ -152,28 +125,126 @@ def NRMSE(data,model):
     nRMSE = RSME / np.mean(data)
     return nRMSE
 
-pat_ind = 31
 
-popt = fit_von_mises(num[pat_ind], 3)
+def objective_function(params,t,data):
+    '''
+    Objective function to be minimized
+    '''
+    # Fit the model
+    y = Von_Mises_model(params,t)
+    return NRMSE(data, y) # error between data and model to be minimized
 
-fit = func(t, *popt)
+
+# Wake time peak
+t1 = map_range_to_pi(28) # 4am
+t2 = map_range_to_pi(35) # 11am 
+# lunch time peak
+t3 = map_range_to_pi(35.1) # 12am
+t4 = map_range_to_pi(16) # 4pm 
+# Dinner time peak
+t5 = map_range_to_pi(17) # 5pm
+t6 = map_range_to_pi(22) # 9pm
+
+# The constraint should be greater than 0, thus we get the following inequalities
+# t1 < x[0] < t2
+# t3 < x[3] < t4
+# t5 < x[6] < t6
+# The constraints are given by the following inequalities
+
+cons = ({'type': 'ineq', 'fun': lambda x:  x[0] - t1},  # x[0] ≥ t1
+        {'type': 'ineq', 'fun': lambda x:  t2 - x[0]},  # x[0] ≤ t2
+
+        {'type': 'ineq', 'fun': lambda x:  x[3] - t3},  # x[3] ≥ t3
+        {'type': 'ineq', 'fun': lambda x:  t4 - x[3]},  # x[3] ≤ t4
+
+        {'type': 'ineq', 'fun': lambda x:  x[6] - t5},  # x[6] ≥ t5
+        {'type': 'ineq', 'fun': lambda x:  t6 - x[6]})  # x[6] ≤ t6
+
+
+def constraint_fun(x):
+    return np.array([
+        x[0] - t1,   # x[0] > t1
+        t2 - x[0],   # x[0] < t2
+        max(x[3] - t3, t4 - x[3]),  # circular constraint for x[3]
+        x[6] - t5,
+        t6 - x[6]
+    ])
+
+nonlin_con = NonlinearConstraint(constraint_fun, 0, np.inf)
+
+def fit_von_mises(time_series, n_basis):
+
+    '''
+    Fit the von Mises basis model to a single time series by minimizing the error between the data and the model (objective function).
+    Inputs:
+    time_series: np.array / list of the data points
+    n_basis: number of basis functions to fit
+    Outputs:
+
+    '''
+
+    guess = np.zeros(3*n_basis)
+
+    bounds = []
+
+    for k in range(n_basis):
+        # Peak location (no bounds)
+        bounds.append((-np.pi, np.pi))  # mean/peak location
+
+        # Amplitude (positive)
+        bounds.append((0, 40))
+
+        # Dispersion (peaky control)
+        bounds.append((2, 200)) # Higer values give a more peaky distribution
+
+        # Make sure the initial guess is within the bounds / statify the constraints
+        if k == 0:
+            guess[3*k] = np.random.uniform(t1,t2)
+        elif k == 1:
+            # The lunch time peak wraps around the time axis
+            test= np.random.uniform(-np.pi,np.pi)
+            while not (test > t3 or test < t4):
+                test = np.random.uniform(-np.pi,np.pi)
+        elif k == 2:
+            guess[3*k] = np.random.uniform(t5,t6)
+        
+        # Amplitute / weight
+        guess[3*k+1] = np.random.uniform(0,40)
+        # Dispersion / standard deviation
+        guess[3*k+2] = np.random.uniform(2,200)
+
+    res = differential_evolution(objective_function,bounds=bounds, args=(t,time_series,),constraints=nonlin_con)
+    #popt, pcov = curve_fit(func, t, time_series, p0=guess, maxfev=100000000)
+
+    return  res
+
+
+pat_ind = 101
+
+res = fit_von_mises(num[pat_ind], 3)
+fit_params = res.x
+fit = Von_Mises_model(fit_params, t)
+
 
 plt.plot(t, num[pat_ind], 'bo-')
 plt.plot(t, fit , 'r-')
 plt.legend(['data', 'model fit'])
 
 ss_res = NRMSE(num[pat_ind],fit)
-# Adding text without box on the plot.
+# # Adding text without box on the plot.
 plt.text(0.01, 0.8,  f"nRMSE = {ss_res:.4}", ha='left', va='top', transform=plt.gca().transAxes)
 
-for i in range(0, len(popt), 3):
-    ctr = popt[i]
-    amp = popt[i+1]
-    wid = popt[i+2]
+for i in range(0, len(fit_params), 3):
+    ctr = fit_params[i]
+    amp = fit_params[i+1]
+    wid = fit_params[i+2]
     y = amp*np.exp(wid*np.cos(t-ctr))/(2*np.pi*i0(wid))
     plt.plot(t, y,'--', alpha = 0.8)
 
 plt.title("Example Von Mises fit for single participant")
+plt.xlabel("Time (hours)")
+plt.ylabel("Cortisol")
+plt.xticks(np.linspace(-np.pi,np.pi,7), ['12', '16', '20', '00', '04', '08', '12'])  # Set x-tick labels
 plt.show()
 
 ```
@@ -182,7 +253,6 @@ plt.show()
 ## Fit 3 basis function to all patients
 
 Lets fit 3 basis function to all patient and see which ones it fits the data well for and identify one that may need to be re-fit due to problems with the default optimization. 
-
 
 
 ```{python}
@@ -194,11 +264,12 @@ basis2 = np.zeros(3)
 basis3 = np.zeros(3)
 
 for i in range(len(num)):
-    popt = fit_von_mises(num[i], n_basis)
-    basis1 = popt[0:3]
-    basis2 = popt[3:6]
-    basis3 = popt[6:9]
-    fit = func(t, *popt)
+    res = fit_von_mises(num[i], 3)
+    fit_params = res.x
+    fit = Von_Mises_model(fit_params, t)
+    basis1 = fit_params[0:3]
+    basis2 = fit_params[3:6]
+    basis3 = fit_params[6:9]
     
     ss_res_save[i] = NRMSE(num[i],fit)
 
@@ -222,7 +293,7 @@ Plot a number of the model fits on a single plot
 
 def plot_single(popt, t, time_series,ax, ss_res = -1):
     ax.plot(t, time_series, 'bo-')
-    ax.plot(t, func(t, *popt) , 'r-')
+    ax.plot(t, Von_Mises_model(popt,t) , 'r-')
     ax.text(0.01, 0.99, f"nRMSE = {ss_res:.2f}", ha='left', va='top', 
             transform=ax.transAxes, fontsize=12, color='black')
     
@@ -286,7 +357,7 @@ plt.ylabel("Frequency")
 plt.show()
 
 
-nRMSE_threshold = 0.4
+nRMSE_threshold = 0.45
 
 plt.plot(ss_res_save, 'o')
 plt.axhline(y = nRMSE_threshold, color = 'r', linestyle = '--')
@@ -312,8 +383,10 @@ num_over = num[ss_res_save_over]
 popt_over = basis_save[ss_res_save_over]
 
 for j in range(len(num_over)):
-    plt.plot(t, num_over[j])
-    plt.plot(t, func(t, *popt_over[j,:]) , 'r-')
+    plt.plot(t, num_over[j],'bo-')
+    plt.plot(t, Von_Mises_model(popt_over[j,:],t) , 'r-')
+    plt.text(0.01, 0.99, f"nRMSE = {ss_res_save[ss_res_save_over][j]:.2f}", ha='left', va='top', 
+            transform=plt.gca().transAxes, fontsize=12, color='black')
     for i in range(0, len(popt_over[0,:]), 3):
         ctr = popt_over[j,i]
         amp = popt_over[j,i+1]
@@ -322,115 +395,6 @@ for j in range(len(num_over)):
         plt.plot(t, y,'--', alpha = 0.8)
 
     plt.show()
-
-```
-
-I the case that we have poor fit we will recalculate the fit starting the optimization procedure at different initial guess and trying to find a better fit.
-
-```{python}
-
-bs1_lb = np.pi/4.0
-bs1_ub = 11/12 * np.pi
-bs2_lb = -np.pi 
-bs2_ub = -np.pi * 2/3
-bs3_lb = -np.pi * 2/3
-bs3_ub = np.pi * 1/4
-bs_bounds = [bs1_lb, bs1_ub, bs2_lb, bs2_ub, bs3_lb, bs3_ub]
-
-def fit_von_mises_opt(time_series, n_basis,nRMSE_threshold):
-
-    '''
-    Fit the von Mises basis to a single time series and retry the optimisation many times to try and gaurantie that the best fit has been found
-    '''
-
-    popt = fit_von_mises(time_series, 3)
-    fit = func(t, *popt)
-
-    # Calculate the accuracy
-    accuracy = NRMSE(time_series,fit)
-    best_fit = accuracy
-
-    guess = np.zeros(3*n_basis)
-    bounds = np.zeros([2, 3*n_basis])
-
-    # Basis 1 wake time
-    bounds[0, 0] = bs1_lb
-    bounds[1, 0] = bs1_ub
-    # Basis 2 lunch time
-    bounds[0, 3] = bs2_lb 
-    bounds[1, 3] =  bs2_ub
-    # Basis 3 dinner time
-    bounds[0, 6] = bs3_lb
-    bounds[1, 6] = bs3_ub
-
-    # If the fit is bad try the optimisation again with a different initial guess
-    if accuracy > nRMSE_threshold:
-
-        for i in range(100):
-            for k in range(n_basis):
-
-                if k == 0:
-                    guess[3*k] = np.random.uniform(bs1_lb,bs1_ub)
-              
-                elif k == 1:
-                    guess[3*k] = np.random.uniform(bs2_lb,bs2_ub)
-                elif k == 2:
-                    guess[3*k] = np.random.uniform(bs3_lb,bs3_ub)
-               
-               # Amplitute / weight
-                guess[3*k+1] = np.random.uniform(0,40) 
-                # Dispersion / standard deviation
-                guess[3*k+2] = np.random.uniform(2,200) 
-
-
-                # Amplitude (we will enforce this to be positive)
-                bounds[0, 3*k + 1] = 0
-                bounds[1, 3*k + 1] = 40
-
-                # The dispersion, to give a more peaky distirbution increase the lower bound 'peaky distributions'
-                bounds[0, 3*k + 2] = 2
-                bounds[1, 3*k + 2] = 200
-
-            popt, pcov = curve_fit(func, t, time_series, p0=guess, maxfev=1000000000)
-            fit = func(t, *popt)
-            accuracy = NRMSE(time_series, fit)
-            if best_fit > accuracy:
-                best_fit = accuracy
-                popt_best = popt
-
-       
-
-    return  popt
-
-
-
-```
-
-Use this new pipeline to fit all time series
-
-```{python}
-
-
-n_basis = 3
-ss_res_save = np.zeros(len(num))
-basis_save = np.zeros([len(num), 3*n_basis])
-basis1 = np.zeros(3)
-basis2 = np.zeros(3)
-basis3 = np.zeros(3)
-
-for i in range(len(num)):
-    popt = fit_von_mises_opt(num[i], n_basis, nRMSE_threshold)
-    basis1 = popt[0:3]
-    basis2 = popt[3:6]
-    basis3 = popt[6:9]
-    fit = func(t, *popt)
-    
-    ss_res_save[i] = NRMSE(num[i],fit)
-
-    basis_save[i,0:3] = basis1
-    basis_save[i,3:6] = basis2
-    basis_save[i,6:9] = basis3 
-
 
 ```
 
@@ -456,25 +420,6 @@ plt.show()
 
 ```
 
-Plot the model fits that have the worst R squared values, to see if these are just problems with the optimization algorithm.
-
-```{python}
-
-
-ss_res_save_over = ss_res_save > nRMSE_threshold
-print(f"Number of fits over threshold ($R^2 > {nRMSE_threshold}$) is: {np.sum(ss_res_save_over)}")
-
-num_over = num[ss_res_save_over]
-popt_over = basis_save[ss_res_save_over]
-
-
-for j in range(len(num_over)):
-    fig, ax = plt.subplots()
-    plot_single(popt_over[j,:], t, num_over[j], ax, ss_res=ss_res_save[ss_res_save_over][j])
-
-    plt.show()
-
-```
 
 From these it seems that the model fits them adequately and the poor $R^2$ is caused by them having multiple peaks that would require more basis functions and not a failure of the optimization.
 
@@ -486,14 +431,17 @@ The shift parameter is the 1st parameter, the weight/amplitude is the 2nd and th
 
 ```{python}
 
+bs_bounds = np.array([t1, t2, t3, t4, t5, t6])
+
 
 dum = 0
 fig, ax = plt.subplots(3,3, figsize = (15,10))
 
 for j in range(3):
     for i in range(3):
-        ax[j,i].hist(basis_save[:,i + 3*j], bins = 20, density = True)
+        ax[j,i].hist(basis_save[:,i + 3*j], bins = 100, density = True)
         ax[j,i].set_title(f"Distribution of parameter {i + 3*j}")
+
 
 
         if i == 0:
@@ -502,6 +450,10 @@ for j in range(3):
             ax[j,i].axvline(x = bs_bounds[dum + 1], color = 'r', linestyle = '--')
             dum = dum +2
 
+ax[2,0].set_ylim(0,3)
+ax[0,0].set_xticks(np.linspace(-np.pi,np.pi,7), ['12', '16', '20', '00', '04', '08', '12'])  # Set x-tick labels
+ax[1,0].set_xticks(np.linspace(-np.pi,np.pi,7), ['12', '16', '20', '00', '04', '08', '12'])  # Set x-tick labels
+ax[2,0].set_xticks(np.linspace(-np.pi,np.pi,7), ['12', '16', '20', '00', '04', '08', '12'])  # Set x-tick labels
 
 plt.show()
 
