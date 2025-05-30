@@ -38,7 +38,7 @@ num = fn.df_to_numpy(df_com, "Cortisol")
 
 common_t = df_com["NewTime"].iloc[0:72].values
 
-df_meta
+df_meta = pd.read_csv("Data/redcap_controls.csv")
 
 ```
 
@@ -56,6 +56,17 @@ pca_res = pca.fit(num)
 
 # Visualise the PCA results
 
+According to the readme - 'Metadata is recoded by participants over 3 days. Hormone sampling typically started in the morning of day 2 and therefore ends 24hrs later in the morning of day 3'
+
+```{python}
+
+
+# get wake times
+wake_times= fn.to_integer_wake_time(pd.to_datetime(df_meta['night2_final_wake']).dt.time)
+
+```
+
+
 ```{python}
 
 fig, ax = plt.subplots(2,3,figsize=(10, 6), sharey=True, sharex=True)
@@ -72,6 +83,9 @@ for i in range(6):
 
 ax[0].set_ylabel("Loading")
 ax[3].set_ylabel("Loading")
+
+y = np.random.uniform(-0.2, 0.38, len(wake_times))
+ax[0].plot(wake_times/24 +24,y, 'ro', label="Wake time")
 
 
 ```

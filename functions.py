@@ -43,6 +43,16 @@ def to_integer(df):
 
     return new_time
 
+def to_integer_wake_time(series):
+
+    new_times = np.zeros(len(series))
+    
+    for i in range(len(series)):
+        # Convert time to minutes since midnight
+        current_time = series.iloc[i]
+        new_times[i] = current_time.hour * 60 + current_time.minute
+
+    return new_times
 
 
 

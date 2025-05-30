@@ -60,7 +60,7 @@ $$
   x_i(t) = \sum_{j=1}^k w_{i,j} \phi_j(t - d_j) 
 $$
 
-Where $x_i(t)$ is the value of the $i$ th time series at time $t$. $w_{i,j}$ is the weight of the $j$ th basis function for the person $i$. $\phi_j(t)$ is the basis function and $k$ is the number of basis functions. 
+Where $x_i(t)$ is the value of the $i$'th time series at time $t$. $w_{i,j}$ are the weight of the $j$'th basis function for the person $i$. $\phi_j(t)$ is the basis function and $k$ is the number of basis functions. 
 
 We take the basis functions to be von Mises distribution, which is given by:
 
@@ -218,6 +218,10 @@ def fit_von_mises(time_series, n_basis):
 
     return  res
 
+```
+
+Example fit for a single participant
+```{python}
 
 pat_ind = 101
 
@@ -285,7 +289,6 @@ for i in range(len(num)):
 
 
 
-
 Plot a number of the model fits on a single plot
 
 ```{python}
@@ -343,9 +346,9 @@ plt.show()
 
 
 
-### Fix the fit for some time series
+### View error in model fits
 
-Sometimes the optimization does not find the best fit. So plot a histogram of the model fits to check the accuracy.
+Lets check a histogram of the model fits to make sure it is doing a good job.
 
 ```{python}
 
@@ -368,11 +371,8 @@ plt.show()
 
 ```
 
-As expected the majority have a low nRMSE value (i.e., a good fit), but there are some that are high, suggesting that the optimization algorithm has not found the best fit / got stuck in a local minima. 
 
-Based on the histogram there are a handful that have R squared values of over 0.4 we will look at these individually.
-
-Plot the model fits that have the worst R squared values, to see if these are just problems with the optimization algorithm.
+Based on the histogram there are a handful that have R squared values of over 0.4 we will look at these individually. - A lot of these can be explained by the fact that there are 2 peaks in a time peroid which the constraints only allow for a single peak / basis function, we are ok with this as we don't want to increase the complexity by adding more basis functions.
 
 ```{python}
 
@@ -397,31 +397,6 @@ for j in range(len(num_over)):
     plt.show()
 
 ```
-
-
-Plot histogram of model fits after manually fitting the ones that had a poor fit
-
-```{python}
-
-plt.hist(ss_res_save)
-plt.title("Histogram of $nRMSE$ values")
-plt.xlabel("nRMSE / error")
-plt.ylabel("Frequency")
-
-plt.show()
-
-
-plt.plot(ss_res_save, 'o')
-plt.axhline(y = nRMSE_threshold, color = 'r', linestyle = '--')
-plt.ylabel("nRMSE")
-plt.xlabel("Sample")
-
-plt.show()
-
-```
-
-
-From these it seems that the model fits them adequately and the poor $R^2$ is caused by them having multiple peaks that would require more basis functions and not a failure of the optimization.
 
 
 
