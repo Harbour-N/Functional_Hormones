@@ -98,11 +98,13 @@ def Von_Mises_model(params,t):
     '''
 
     y = np.zeros_like(t)
-    for i in range(0, len(params), 3):
+    for i in range(0, len(params)-1, 3):
         ctr = params[i]
         amp = params[i+1]
         wid = params[i+2]
         y = y + amp*np.exp(wid*np.cos(t-ctr))/(2*np.pi*i0(wid))
+    # Add a constant parameter
+    y = y + params[-1]
     return y
 
 
@@ -183,9 +185,9 @@ def fit_von_mises(time_series, n_basis):
 
     '''
 
-    guess = np.zeros(3*n_basis)
+    guess = np.zeros(3*n_basis + 1)
 
-    bounds = []
+    bounds = []  
 
     for k in range(n_basis):
         # Peak location (no bounds)
@@ -196,6 +198,10 @@ def fit_von_mises(time_series, n_basis):
 
         # Dispersion (peaky control)
         bounds.append((2, 200)) # Higer values give a more peaky distribution
+
+        if k == 2:
+            # Add a constant parameter to the model
+            bounds.append((0, 10))  # Constant offset
 
         # Make sure the initial guess is within the bounds / statify the constraints
         if k == 0:
@@ -212,6 +218,8 @@ def fit_von_mises(time_series, n_basis):
         guess[3*k+1] = np.random.uniform(0,40)
         # Dispersion / standard deviation
         guess[3*k+2] = np.random.uniform(2,200)
+
+    guess[-1] = np.random.uniform(0, 10)  # Constant offset
 
     res = differential_evolution(objective_function,bounds=bounds, args=(t,time_series,),constraints=nonlin_con)
     #popt, pcov = curve_fit(func, t, time_series, p0=guess, maxfev=100000000)
@@ -238,12 +246,14 @@ ss_res = NRMSE(num[pat_ind],fit)
 # # Adding text without box on the plot.
 plt.text(0.01, 0.8,  f"nRMSE = {ss_res:.4}", ha='left', va='top', transform=plt.gca().transAxes)
 
-for i in range(0, len(fit_params), 3):
+for i in range(0, len(fit_params)-1, 3):
     ctr = fit_params[i]
     amp = fit_params[i+1]
     wid = fit_params[i+2]
     y = amp*np.exp(wid*np.cos(t-ctr))/(2*np.pi*i0(wid))
     plt.plot(t, y,'--', alpha = 0.8)
+
+plt.axhline(y = fit_params[-1], color='m', linestyle='--', label='Constant offset')
 
 plt.title("Example Von Mises fit for single participant")
 plt.xlabel("Time (hours)")
@@ -262,10 +272,11 @@ Lets fit 3 basis function to all patient and see which ones it fits the data wel
 ```{python}
 n_basis = 3
 ss_res_save = np.zeros(len(num))
-basis_save = np.zeros([len(num), 3*n_basis])
+basis_save = np.zeros([len(num), 3*n_basis+1])
 basis1 = np.zeros(3)
 basis2 = np.zeros(3)
 basis3 = np.zeros(3)
+basis_constant = np.zeros(1)
 
 for i in range(len(num)):
     res = fit_von_mises(num[i], 3)
@@ -274,6 +285,7 @@ for i in range(len(num)):
     basis1 = fit_params[0:3]
     basis2 = fit_params[3:6]
     basis3 = fit_params[6:9]
+    basis_constant = fit_params[-1]
     
     ss_res_save[i] = NRMSE(num[i],fit)
 
@@ -283,6 +295,7 @@ for i in range(len(num)):
     basis_save[i,0:3] = basis1
     basis_save[i,3:6] = basis2
     basis_save[i,6:9] = basis3
+    basis_save[i,9] = basis_constant
 
 
 ```
@@ -300,14 +313,14 @@ def plot_single(popt, t, time_series,ax, ss_res = -1):
     ax.text(0.01, 0.99, f"nRMSE = {ss_res:.2f}", ha='left', va='top', 
             transform=ax.transAxes, fontsize=12, color='black')
     
-    for i in range(0, len(popt), 3):
+    for i in range(0, len(popt)-1, 3):
         ctr = popt[i]
         amp = popt[i+1]
         wid = popt[i+2]
         y = amp*np.exp(wid*np.cos(t-ctr))/(2*np.pi*i0(wid))
         ax.plot(t, y,'--', alpha = 0.8)
 
-
+    ax.axhline(y = popt[-1], color='m', linestyle='--', label='Constant offset')
     # Set y-axis ticks to be integers only
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 ```
@@ -387,12 +400,13 @@ for j in range(len(num_over)):
     plt.plot(t, Von_Mises_model(popt_over[j,:],t) , 'r-')
     plt.text(0.01, 0.99, f"nRMSE = {ss_res_save[ss_res_save_over][j]:.2f}", ha='left', va='top', 
             transform=plt.gca().transAxes, fontsize=12, color='black')
-    for i in range(0, len(popt_over[0,:]), 3):
+    for i in range(0, len(popt_over[0,:])-1, 3):
         ctr = popt_over[j,i]
         amp = popt_over[j,i+1]
         wid = popt_over[j,i+2]
         y = amp*np.exp(wid*np.cos(t-ctr))/(2*np.pi*i0(wid))
         plt.plot(t, y,'--', alpha = 0.8)
+    plt.axhline(y = popt_over[j,-1], color='m', linestyle='--', label='Constant offset')
 
     plt.show()
 
@@ -432,6 +446,12 @@ ax[2,0].set_xticks(np.linspace(-np.pi,np.pi,7), ['12', '16', '20', '00', '04', '
 
 plt.show()
 
+plt.hist(basis_save[:,9], bins = 100, density = True)
+plt.title("Distribution of constant offset parameter")
+plt.xlabel("Constant offset")
+plt.ylabel("Density")
+plt.show()
+
 ```
 
 
@@ -441,7 +461,7 @@ plt.show()
 ```{python}
 
 # Define the column names
-column_names = ['MasterID', 'Cortisol', 'param_values', 'Param0', 'param1', 'param2', 'param3','param4', 'param5','param6','param7', 'param8' ,'R2']
+column_names = ['MasterID', 'Cortisol', 'param_values', 'Param0', 'param1', 'param2', 'param3','param4', 'param5','param6','param7', 'param8','param9' ,'R2']
 
 # Create a list to hold the new rows
 rows = []
@@ -462,6 +482,7 @@ for i in range(len(MasterIDs)):
         'param6': basis_save[i, 6],
         'param7': basis_save[i, 7],
         'param8': basis_save[i, 8],
+        'param9': basis_save[i, 9],
         'R2': ss_res_save[i]
     }
     rows.append(new_row)
