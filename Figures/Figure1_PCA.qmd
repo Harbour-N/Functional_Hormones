@@ -1,0 +1,159 @@
+---
+title: Perform PCA on the cortisol time series data and make plots
+authors:
+  - name: Nicholas Harbour
+format: 
+  html:
+    embed-resources: true
+    code-fold: true
+    number-sections: true
+    toc: true
+    toc-depth: 3
+    date: now
+    date-modified: last-modified
+    date-format: "MMMM DD, YYYY, HH:mm:ss"
+jupyter: python3
+---
+
+
+
+
+```{python}
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+import sys
+
+# add parent directory to path as this is where the functions are stored
+sys.path.append("..")
+# import functions 
+import functions as fn
+
+```
+
+
+Load in the data
+```{python}
+
+df_com = pd.read_csv("Data/Hormone_time_series_data_interpolated.csv")
+
+num = fn.df_to_numpy(df_com, "Cortisol")
+
+common_t = df_com["NewTime"].iloc[0:72].values
+
+df_meta = pd.read_csv("Data/redcap_controls.csv")
+
+```
+
+
+# Perform PCA on cortisol time series data
+
+```{python}
+
+pca = PCA(n_components=10)
+pca_res = pca.fit(num)
+
+
+```
+
+
+# Make Figure of PCA results
+
+First extract the wake, lunch and dinner times from the metadata.
+
+According to the readme - 'Metadata is recoded by participants over 3 days. Hormone sampling typically started in the morning of day 2 and therefore ends 24hrs later in the morning of day 3'
+
+```{python}
+
+
+# get wake times
+wake_times= fn.to_integer_wake_time(pd.to_datetime(df_meta['night2_final_wake']).dt.time)
+
+# Lunch time
+lunch_times = fn.to_integer_wake_time(pd.to_datetime(df_meta['day2_lunch_time_v2']).dt.time)
+
+dinner_times = fn.to_integer_wake_time(pd.to_datetime(df_meta['day2_dinner_time_v2']).dt.time)
+dinner_times[dinner_times == 0] = np.nan
+
+```
+
+
+```{python}
+
+pc_to_plot = [0,5,6] # note these are off by one due to python zero indexing
+
+fig, ax = plt.subplots(2,2,figsize=(14, 10))
+
+ax = ax.flatten()
+
+# plot the selected PCA components
+for i in range(len(pc_to_plot)):
+    ax[i].plot(common_t,pca_res.components_[pc_to_plot[i],:])
+    ax[i].set_title(f"PC {pc_to_plot[i]+1}")
+    ax[i].set_xlabel("Time")
+    ax[i].set_xticks(np.arange(720, 2160+240, 240), ['12', '16', '20', '24', '04', '08','12'])
+    ax[i].set_ylabel("Loading")
+
+
+y = np.random.uniform(-0.2, 0.38, len(wake_times))
+ax[0].plot(wake_times + 24*60,y, 'ro', label="Wake time", alpha = 0.25) # Since wake times are on second day we add 24 hours to the time
+ax[1].plot(dinner_times, y, 'bo', label="Dinner time", alpha = 0.25) # Since dinner times are on second day we add 24 hours to the time
+ax[2].plot(lunch_times , y, 'go', label="Lunch time", alpha = 0.25) # Since lunch times are on second day we add 24 hours to the time
+
+
+# In last box plot cumulative explained variance
+pc_sum =  np.cumsum(pca.explained_variance_ratio_)
+ax[3].plot(np.arange(1,11,1),pc_sum, marker='o', color = 'black')
+ax[3].set_xticks(np.arange(1,11,1))
+ax[3].set_title("Explained variance of PCA components")
+ax[3].set_xlabel("PC")
+ax[3].set_ylabel("Cumulative explained variance")
+ax[3].set_ylim(0,1)
+ax[3].set_xlim(0.75,10.25)
+ax[3].hlines(y = pc_sum[-1], xmin = 0, xmax = 10, color='red', linestyle='--', label='Total explained variance')
+ax[3].set_yticks([0.0,0.2,0.4,0.6,0.8,0.93,1.0])
+
+plt.tight_layout()
+plt.show()
+
+```
+
+
+# Explained variance of PCs
+
+```{python}
+
+
+
+plt.plot(np.arange(1,11), np.cumsum(pca.explained_variance_ratio_), marker='o')
+plt.title("Explained variance of PCA components")
+plt.xlabel("Principal component")
+plt.ylabel("Cumulative explained variance")
+
+```
+
+
+
+
+
+# Suplimentary figure - All PCA components
+
+```{python}
+
+fig, ax = plt.subplots(5,2,figsize=(13, 15), sharey=True, sharex=True)
+
+ax = ax.flatten()
+for i in range(10):
+    ax[i].plot(common_t,pca_res.components_[i,:])
+    ax[i].set_title(f"PC {i+1}")
+    if i >7:
+      ax[i].set_xlabel("Time")
+      ax[i].set_xticks(np.arange(720, 2160+240, 240), ['12', '16', '20', '24', '04', '08','12'])
+
+
+```
+
+
+# Suplimentray figure - PC added and subtracted from the mean

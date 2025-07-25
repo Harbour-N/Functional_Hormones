@@ -266,7 +266,7 @@ plt.show()
 
 ## Fit 3 basis function to all patients
 
-Lets fit 3 basis function to all patient and see which ones it fits the data well for and identify one that may need to be re-fit due to problems with the default optimization. 
+Lets fit 3 basis function to all patients
 
 
 ```{python}
@@ -339,14 +339,14 @@ for i in range(rows):
           break
       plot_single(basis_save[i*cols + j,:], t, num[i*cols + j,:], ax[i,j], ss_res_save[i*cols + j])
 
-
-# Remove x-tick labels for all plots except for the last row
-for i in range(rows):
-    for j in range(cols):
-        if i < rows - 1:  # If not in the last row
+      # Remove x-tick labels for all plots except for the last row
+      if i < rows - 1:  # If not in the last row
             ax[i, j].set_xticklabels([])  # Remove x-tick labels
-        else:
+      else:
             ax[i, j].set_xticks(np.linspace(-np.pi,np.pi,7), ['12', '16', '20', '00', '04', '08', '12'])  # Set x-tick labels
+
+
+
 
 # Add a legend at the center top of the figure
 fig.legend(['Data', 'Fit', 'Basis 1', 'Basis 2', 'Basis 3'], loc='upper center', ncol=5, fontsize=16, bbox_to_anchor=(0.5, 0.9))
@@ -501,8 +501,241 @@ df_param.head()
 
 
 
+# Aldosterone
+
+```{python}
+
+num_Aldo = df_to_numpy(df_com, "Aldo")
+
+```
+
+
+```{python}
+
+n_basis = 3
+ss_res_save = np.zeros(len(num_Aldo))
+basis_save = np.zeros([len(num_Aldo), 3*n_basis+1])
+basis1 = np.zeros(3)
+basis2 = np.zeros(3)
+basis3 = np.zeros(3)
+basis_constant = np.zeros(1)
+
+for i in range(len(num_Aldo)):
+    print(i)
+    if np.isnan(num_Aldo[i]).any():
+        continue
+    res = fit_von_mises(num_Aldo[i], 3)
+    fit_params = res.x
+    fit = Von_Mises_model(fit_params, t)
+    basis1 = fit_params[0:3]
+    basis2 = fit_params[3:6]
+    basis3 = fit_params[6:9]
+    basis_constant = fit_params[-1]
+    
+    ss_res_save[i] = NRMSE(num_Aldo[i],fit)
+
+    # Order the basis functions by the weight (the final parameter)
+    #basis1, basis2, basis3 = order_basis(basis1, basis2, basis3)
+
+    basis_save[i,0:3] = basis1
+    basis_save[i,3:6] = basis2
+    basis_save[i,6:9] = basis3
+    basis_save[i,9] = basis_constant
 
 
 
+```
 
+
+```{python}
+
+rows = 8
+cols = 5
+fig, ax = plt.subplots(rows,cols , figsize=(21, 28))
+plt.subplots_adjust(hspace=0.1, wspace=0.15)  # Adjust space between subplots
+
+
+for i in range(rows):
+    for j in range(cols):
+      if i*10 + j >= len(num):
+          break
+      plot_single(basis_save[i*cols + j,:], t, num_Aldo[i*cols + j,:], ax[i,j], ss_res_save[i*cols + j])
+
+
+# Remove x-tick labels for all plots except for the last row
+for i in range(rows):
+    for j in range(cols):
+        if i < rows - 1:  # If not in the last row
+            ax[i, j].set_xticklabels([])  # Remove x-tick labels
+        else:
+            ax[i, j].set_xticks(np.linspace(-np.pi,np.pi,7), ['12', '16', '20', '00', '04', '08', '12'])  # Set x-tick labels
+
+# Add a legend at the center top of the figure
+fig.legend(['Data', 'Fit', 'Basis 1', 'Basis 2', 'Basis 3'], loc='upper center', ncol=5, fontsize=16, bbox_to_anchor=(0.5, 0.9))
+
+
+plt.show()
+
+```
+
+
+```{python}
+
+# Define the column names
+column_names = ['MasterID', 'Aldo', 'param_values', 'Param0', 'param1', 'param2', 'param3','param4', 'param5','param6','param7', 'param8','param9' ,'R2']
+
+# Create a list to hold the new rows
+rows = []
+
+MasterIDs = df_com["MasterID"].unique()
+
+for i in range(len(MasterIDs)):
+    new_row = {
+        'MasterID': MasterIDs[i], 
+        'Aldo': num_Aldo[i],
+        'param_values': basis_save[i, :],
+        'Param0': basis_save[i, 0],
+        'param1': basis_save[i, 1],
+        'param2': basis_save[i, 2],
+        'param3': basis_save[i, 3],
+        'param4': basis_save[i, 4],
+        'param5': basis_save[i, 5],
+        'param6': basis_save[i, 6],
+        'param7': basis_save[i, 7],
+        'param8': basis_save[i, 8],
+        'param9': basis_save[i, 9],
+        'R2': ss_res_save[i]
+    }
+    rows.append(new_row)
+
+# Create the DataFrame from the list of rows
+df_param = pd.DataFrame(rows, columns=column_names)
+
+# Save the dataframe to csv
+df_param.to_csv("Param_values_Aldo.csv", index=False)
+
+# Display the first few rows of dataframe
+df_param.head()
+
+
+```
+
+
+
+# Cortisone
+
+```{python}
+
+num_Cortisone = df_to_numpy(df_com, "Cortisone")
+
+```
+
+
+```{python}
+
+n_basis = 3
+ss_res_save = np.zeros(len(num_Cortisone))
+basis_save = np.zeros([len(num_Cortisone), 3*n_basis+1])
+basis1 = np.zeros(3)
+basis2 = np.zeros(3)
+basis3 = np.zeros(3)
+basis_constant = np.zeros(1)
+
+for i in range(len(num_Cortisone)):
+    print(i)
+    if np.isnan(num_Cortisone[i]).any():
+        continue
+    res = fit_von_mises(num_Cortisone[i], 3)
+    fit_params = res.x
+    fit = Von_Mises_model(fit_params, t)
+    basis1 = fit_params[0:3]
+    basis2 = fit_params[3:6]
+    basis3 = fit_params[6:9]
+    basis_constant = fit_params[-1]
+    
+    ss_res_save[i] = NRMSE(num_Cortisone[i],fit)
+
+    # Order the basis functions by the weight (the final parameter)
+    #basis1, basis2, basis3 = order_basis(basis1, basis2, basis3)
+
+    basis_save[i,0:3] = basis1
+    basis_save[i,3:6] = basis2
+    basis_save[i,6:9] = basis3
+    basis_save[i,9] = basis_constant
+
+
+
+```
+
+
+```{python}
+
+rows = 8
+cols = 5
+fig, ax = plt.subplots(rows,cols , figsize=(21, 28))
+plt.subplots_adjust(hspace=0.1, wspace=0.15)  # Adjust space between subplots
+
+
+for i in range(rows):
+    for j in range(cols):
+      if i*10 + j >= len(num):
+          break
+      plot_single(basis_save[i*cols + j,:], t, num_Cortisone[i*cols + j,:], ax[i,j], ss_res_save[i*cols + j])
+      
+      # Remove x-tick labels for all plots except for the last row
+      if i < rows - 1:  # If not in the last row
+            ax[i, j].set_xticklabels([])  # Remove x-tick labels
+      else:
+            ax[i, j].set_xticks(np.linspace(-np.pi,np.pi,7), ['12', '16', '20', '00', '04', '08', '12'])  # Set x-tick labels
+
+
+# Add a legend at the center top of the figure
+fig.legend(['Data', 'Fit', 'Basis 1', 'Basis 2', 'Basis 3'], loc='upper center', ncol=5, fontsize=16, bbox_to_anchor=(0.5, 0.9))
+
+
+plt.show()
+
+```
+
+
+```{python}
+
+# Define the column names
+column_names = ['MasterID', 'Cortisone', 'param_values', 'Param0', 'param1', 'param2', 'param3','param4', 'param5','param6','param7', 'param8','param9' ,'R2']
+
+# Create a list to hold the new rows
+rows = []
+
+MasterIDs = df_com["MasterID"].unique()
+
+for i in range(len(MasterIDs)):
+    new_row = {
+        'MasterID': MasterIDs[i], 
+        'Cortisone': num_Cortisone[i],
+        'param_values': basis_save[i, :],
+        'Param0': basis_save[i, 0],
+        'param1': basis_save[i, 1],
+        'param2': basis_save[i, 2],
+        'param3': basis_save[i, 3],
+        'param4': basis_save[i, 4],
+        'param5': basis_save[i, 5],
+        'param6': basis_save[i, 6],
+        'param7': basis_save[i, 7],
+        'param8': basis_save[i, 8],
+        'param9': basis_save[i, 9],
+        'R2': ss_res_save[i]
+    }
+    rows.append(new_row)
+
+# Create the DataFrame from the list of rows
+df_param = pd.DataFrame(rows, columns=column_names)
+
+# Save the dataframe to csv
+df_param.to_csv("Param_values_Cortisone.csv", index=False)
+
+# Display the first few rows of dataframe
+df_param.head()
+
+
+```
 
